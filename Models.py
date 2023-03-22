@@ -1,55 +1,31 @@
-import torch
 import torch.nn as nn
-import copy
+import math
 
-from Layers import EncoderLayer, DecoderLayer
-from Sublayers import Norm
-from utils import Embedder, PositionalEncoder
-
-def get_clones(module, N):
-    return nn.ModuleList([copy.deepcopy(module) for i in range(N)])
-
-class Encoder(nn.Module):
-    def __init__(self, vocab_size, d_model, N, heads):
-        super().__init__()
-        self.N = N
-        self.embed = Embedder(vocab_size, d_model)
-        self.pe = PositionalEncoder(d_model)
-        self.layers = get_clones(EncoderLayer(d_model, heads), N)
-        self.norm = Norm(d_model)
-
-    def forward(self, src, mask):
-        x = self.embed(src)
-        x = self.pe(x)
-        for i in range(N):
-            x = self.layers[i](x, mask)
-        return self.norm(x)
-
-class Decoder(nn.Module):
-    def __init__(self, vocab_size, d_model, N, heads):
-        super().__init__()
-        self.N = N
-        self.embed = Embedder(vocab_size, d_model)
-        self.pe = PositionalEncoder(d_model)
-        self.layers = get_clones(DecoderLayer(d_model, heads), N)
-        self.norm = Norm(d_model)
-
-    def forward(self, trg, e_outputs, src_mask, trg_mask):
-        x = self.embed(trg)
-        x = self.pe(x)
-        for i in range(self.N):
-            x = self.layers[i](x, e_outputs, src_mask, trg_mask)
-        return self.norm(x)
+from torch.nn import TransformerEncoder, TransformerEncoderLayer
+from utils import PositionalEncoder
 
 class Transformer(nn.Module):
-    def __init__(self, src_vocab, trg_vocab, d_model, N, heads):
+    def __init__(self, ntoken, d_model, nhead, d_hid, nlayers, dropout=0.5):
         super().__init__()
-        self.encoder = Encoder(src_vocab, d_model, N, heads)
-        self.decoder = Decoder(trg_vocab, d_model, N, heads)
-        self.out = nn.Linear(d_model, trg_vocab)
+        self.model_type = 'Transformer'
+        self.pos_encoder = PositionalEncoder(d_model, dropout)
+        encoder_layers = TransformerEncoderLayer(d_model, nhead, d_hid, dropout)
+        self.transformer_encoder = TransformerEncoder(encoder_layers, nlayers)
+        self.encoder = nn.Embedding(ntoken, d_model)
+        self.d_model = d_model
+        self.decoder = nn.Linear(d_model, ntoken)
+
+        self.init_weights()
+    
+    def init_weights(self) -> None:
+        initrange = 0.1
+        self.encoder.weight.data.uniform_(-initrange, initrange)
+        self.decoder.bias.data.zero_()
+        self.decoder.weight.data.uniform_(-initrange, initrange)
 
     def forward(self, src, trg, src_mask, trg_mask):
-        e_outputs = self.encoder(src, src_mask)
-        d_output = self.decoder(trg, e_outputs, src_mask, trg_mask)
-        output = self.out(d_output)
+        src = self.encoder(src) * math.sqrt(self.d_model)
+        src = self.pos_encoder(src)
+        output = self.transformer_encoder(src, src_mask)
+        output = self.decoder(output)
         return output
