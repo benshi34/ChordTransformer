@@ -1,5 +1,5 @@
 from utils import tokenize
-from trainer import train, evaluate
+from chord_trainer import train, evaluate
 from models import Transformer
 from tempfile import TemporaryDirectory
 import argparse
