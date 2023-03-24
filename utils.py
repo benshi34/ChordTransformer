@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 import math
 
+token_to_index = {'1m':0, '1M':1, '2m':2, '2M':3, '3m':4, '3M':5, '4m':6, '4M':7, '5m':8, '5M':9, '6m':10, '6M':11, '7m':12, '7M':13, 'Intro':14, 'Verse':15, 'Prechorus':16, 'Chorus':17, 'Start':18, 'End':19, 'Pad':20}
+
 class Embedder(nn.Module):
     def __init__(self, vocab_size, d_model):
         super().__init__()
@@ -38,6 +40,7 @@ class Progression:
     def __str__(self):
         return str(self.data)
 
+# EXTRA
 class PPMI:
     def __init__(self, context_window):
         matrix = []
@@ -47,7 +50,7 @@ class PPMI:
         # Each row is the PMI vector representation of token i
         self.matrix = matrix
         self.context_left, self.context_right = context_window
-        self.token_to_index = {'1m':0, '1M':1, '2m':2, '2M':3, '3m':4, '3M':5, '4m':6, '4M':7, '5m':8, '5M':9, '6m':10, '6M':11, '7m':12, '7M':13, 'Intro':14, 'Verse':15, 'Prechorus':16, 'Chorus':17, 'Start':18}
+        self.token_to_index = {'1m':0, '1M':1, '2m':2, '2M':3, '3m':4, '3M':5, '4m':6, '4M':7, '5m':8, '5M':9, '6m':10, '6M':11, '7m':12, '7M':13, 'Intro':14, 'Verse':15, 'Prechorus':16, 'Chorus':17, 'Start':18, 'End':19, 'Pad':20}
     # Takes in a progression and handles the counting
     def addProgression(self, progression):
         prog = progression.data
@@ -95,3 +98,38 @@ class PPMI:
 
 def generate_square_subsequent_mask(sz):
     return torch.triu(torch.ones(sz, sz) * float('-inf'), diagonal=1)
+
+# Input: Array of progression
+# Output: Tensor of data and target
+def get_input_output(prog):
+    print(prog.data)
+    data = torch.tensor(prog.data)
+    target = prog.data[1:]
+    target.append(20) # Int from of pad token
+    target = torch.tensor(target)
+    return data, target
+
+def tokenize(songs):
+    prog_arr = []
+    for song in songs:
+        prog_arr.append(Progression(song))
+    
+    # Adding end tokens
+    for prog in prog_arr: 
+        prog.data.append('End')
+        prog.data.insert(0, 'Start')
+    
+    # Padding to all the same length
+    maxi = 0
+    for prog in prog_arr: 
+        maxi = max(maxi, len(prog.data))
+    for prog in prog_arr:
+        while len(prog.data) < maxi: 
+            prog.data.append('Pad')
+
+    # Changing strings to int representation
+    for prog in prog_arr: 
+        for i in range(len(prog.data)):
+            prog.data[i] = token_to_index[prog.data[i]]
+
+    return prog_arr
